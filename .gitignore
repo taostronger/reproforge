@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Spike 产物
+out/
+spike/sample.wav
+spike/generated_test.spec.ts
+
+# 密钥
+.env
+
+# OS
+.DS_Store
