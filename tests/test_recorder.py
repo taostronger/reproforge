@@ -3,7 +3,12 @@
 """
 import sys
 import os
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# 集成测试：需 playwright + demo_project 在 localhost:5173，缺则跳过（不阻塞 pytest 收集）
+pytest.importorskip("playwright")
 
 from capture.recorder import record
 
