@@ -30,7 +30,7 @@ else
     edge-tts --voice zh-CN-XiaoxiaoNeural --text "我把数量改成2，总价还是80，应该是160" --write-media spike/sample.wav 2>/dev/null
     python spike/transcribe_spike.py spike/sample.wav
   else
-    echo "SKIP闸门2: 陶壮可本地录5秒音频上传到 spike/sample.wav 后重跑"
+    echo "SKIP闸门2: 请本地录5秒音频上传到 spike/sample.wav 后重跑"
   fi
 fi
 echo
