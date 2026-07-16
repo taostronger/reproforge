@@ -22,6 +22,15 @@ def test_generate_test_calls_chat():
     m.assert_called_once()
 
 
+def test_generate_test_strips_markdown_fence():
+    # 真实 LLM 常把代码包在 ```ts ... ``` 围栏里；真跑前必须剥离
+    raw = "```ts\ntest('x', async ({page}) => { await page.goto('/'); });\n```"
+    with patch("agents.reproduction.chat", return_value=raw):
+        code = generate_test([{"type": "fill", "target": "qty-input", "value": "2", "text": "数量"}], "160", "80")
+    assert "```" not in code
+    assert "test(" in code
+
+
 def test_fix_locator_calls_chat():
     with patch("agents.reproduction.chat") as m:
         m.return_value = "fixed code"
