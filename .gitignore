@@ -6,6 +6,10 @@ __pycache__/
 # Node
 node_modules/
 
+# Playwright 产物（demo_project）
+demo_project/test-results/
+demo_project/playwright-report/
+
 # Spike 产物
 out/
 spike/sample.wav
