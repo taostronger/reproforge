@@ -10,6 +10,7 @@ node_modules/
 out/
 spike/sample.wav
 spike/generated_test.spec.ts
+spike/smoke_generated.spec.ts
 
 # 密钥
 .env

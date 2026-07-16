@@ -4,6 +4,7 @@
 确定性部分（写文件/循环/最小化编排）+ LLM 部分（generate_test/fix_locator 调 chat）。
 """
 import os
+import re
 import tempfile
 from dataclasses import dataclass
 
@@ -76,6 +77,12 @@ def _extract_error(run_times_result):
     return ""
 
 
+def _strip_fence(text):
+    """剥离 markdown 代码围栏（```ts ... ```），保留纯代码（真跑前必需）。"""
+    m = re.search(r"```(?:typescript|ts|js|javascript)?\s*\n?(.*?)```", text, re.S)
+    return (m.group(1) if m else text).strip()
+
+
 def generate_test(steps, expected, actual, base_url="http://localhost:5173"):
     prompt = _GEN_PROMPT.format(
         base_url=base_url,
@@ -83,7 +90,7 @@ def generate_test(steps, expected, actual, base_url="http://localhost:5173"):
         expected=expected,
         actual=actual,
     )
-    return chat([{"role": "user", "content": prompt}])
+    return _strip_fence(chat([{"role": "user", "content": prompt}]))
 
 
 def fix_locator(spec_code, error_msg):
