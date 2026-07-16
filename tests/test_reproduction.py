@@ -31,6 +31,14 @@ def test_generate_test_strips_markdown_fence():
     assert "test(" in code
 
 
+def test_generate_test_ensures_import():
+    # 即使 LLM 漏了 import，generate_test 应补上（否则真跑 ReferenceError: test is not defined）
+    with patch("agents.reproduction.chat", return_value="test('x', async ({page}) => { await page.goto('/'); });"):
+        code = generate_test([{"type": "fill", "target": "qty-input", "value": "2", "text": "数量"}], "160", "80")
+    assert "@playwright/test" in code
+    assert "import" in code
+
+
 def test_fix_locator_calls_chat():
     with patch("agents.reproduction.chat") as m:
         m.return_value = "fixed code"

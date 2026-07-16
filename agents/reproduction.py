@@ -30,10 +30,11 @@ _GEN_PROMPT = """你是测试工程师。根据操作步骤生成一个 Playwrig
 {actions}
 预期值：{expected}；实际值（Bug 表现）：{actual}
 要求：
-1. 用 test('...', async ({{ page }}) => {{ ... }}) 语法
-2. 定位器优先 getByTestId，其次 getByRole / getByPlaceholder
-3. 末尾断言关键元素（如 [data-testid=total-price]）的文本为【预期值】
-4. 只输出测试代码（```ts ... ```），不要解释。"""
+1. 开头必须 import {{ test, expect }} from '@playwright/test';
+2. 用 test('...', async ({{ page }}) => {{ ... }}) 语法
+3. 定位器优先 getByTestId，其次 getByRole / getByPlaceholder
+4. 末尾断言关键元素（如 [data-testid=total-price]）的文本为【预期值】
+5. 只输出测试代码（```ts ... ```），不要解释。"""
 
 _FIX_PROMPT = """这个 Playwright 测试运行失败，原因是定位器问题。
 失败信息：{error}
@@ -83,6 +84,13 @@ def _strip_fence(text):
     return (m.group(1) if m else text).strip()
 
 
+def _ensure_import(spec):
+    """保证 spec 含 Playwright import（LLM 偶尔漏，真跑会 ReferenceError）。"""
+    if "@playwright/test" not in spec:
+        return "import { test, expect } from '@playwright/test';\n\n" + spec
+    return spec
+
+
 def generate_test(steps, expected, actual, base_url="http://localhost:5173"):
     prompt = _GEN_PROMPT.format(
         base_url=base_url,
@@ -90,7 +98,7 @@ def generate_test(steps, expected, actual, base_url="http://localhost:5173"):
         expected=expected,
         actual=actual,
     )
-    return _strip_fence(chat([{"role": "user", "content": prompt}]))
+    return _ensure_import(_strip_fence(chat([{"role": "user", "content": prompt}])))
 
 
 def fix_locator(spec_code, error_msg):
