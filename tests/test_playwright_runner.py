@@ -35,6 +35,21 @@ def test_run_test_fallback_to_exitcode_when_json_bad():
     assert r.passed is True
 
 
+def test_run_test_uses_relpath_and_cwd_when_given():
+    # 给 cwd 时，spec 路径转相对 posix（避免绝对路径反斜杠被 playwright 当转义 → No tests found）
+    # 且用 utf-8 编码（playwright 输出含非 ASCII 不崩）
+    with patch("test_runner.runner.subprocess.run") as m:
+        m.return_value = _cp(0, '{"stats":{"passes":1,"failures":0}}')
+        run_test("C:/proj/tests/x.spec.ts", cwd="C:/proj")
+    call = m.call_args
+    cmd = call[0][0]
+    spec_arg = cmd[-2]  # ... test <spec_arg> --reporter=json
+    assert spec_arg.endswith("x.spec.ts")
+    assert "C:" not in spec_arg          # 已转相对
+    assert call[1].get("cwd") == "C:/proj"
+    assert call[1].get("encoding") == "utf-8"
+
+
 def test_run_n_times_counts_pass_fail():
     outputs = [
         _cp(0, '{"stats":{"passes":1,"failures":0,"unexpected":0}}'),

@@ -55,21 +55,28 @@ def _parse_report(stdout):
     return (failures == 0), []
 
 
-def run_test(spec_path, timeout: int = 60) -> RunResult:
+def run_test(spec_path, timeout: int = 60, cwd=None) -> RunResult:
     start = time.monotonic()
+    # playwright 把参数当正则匹配文件路径：给 cwd 时转相对 posix 路径，
+    # 避免绝对路径反斜杠被当转义 → "No tests found"
+    if cwd:
+        spec_arg = os.path.relpath(spec_path, cwd).replace(os.sep, "/")
+    else:
+        spec_arg = spec_path
     proc = subprocess.run(
-        _build_cmd(spec_path), capture_output=True, text=True, timeout=timeout
+        _build_cmd(spec_arg), capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd,
     )
     duration = time.monotonic() - start
     parsed, screenshots = _parse_report(proc.stdout)
     passed = (proc.returncode == 0) if parsed is None else parsed
     return RunResult(
-        passed=passed, stdout=proc.stdout, screenshots=screenshots, duration=duration
+        passed=passed, stdout=proc.stdout or "", screenshots=screenshots, duration=duration
     )
 
 
-def run_n_times(spec_path, n: int = 3) -> RunTimesResult:
-    results = [run_test(spec_path) for _ in range(n)]
+def run_n_times(spec_path, n: int = 3, cwd=None) -> RunTimesResult:
+    results = [run_test(spec_path, cwd=cwd) for _ in range(n)]
     pass_count = sum(1 for r in results if r.passed)
     fail_count = len(results) - pass_count
     return RunTimesResult(pass_count=pass_count, fail_count=fail_count, results=results)

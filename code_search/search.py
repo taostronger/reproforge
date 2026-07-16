@@ -74,7 +74,8 @@ def _enclosing_context(file_path, line_numbers):
 
 
 # ---- 检索引擎：ripgrep 优先，降级纯 Python ----
-_IGNORED_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", ".venv", "venv"}
+_IGNORED_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", ".venv", "venv",
+                 "test-results", "playwright-report", ".playwright", "blob-report", ".nyc_output"}
 _CODE_EXT = (".tsx", ".ts", ".jsx", ".js", ".py", ".json", ".css", ".html", ".md", ".vue", ".java", ".go", ".rs")
 
 
