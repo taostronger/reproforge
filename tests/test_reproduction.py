@@ -88,3 +88,18 @@ def test_reproduce_all_pass_is_no_bug():
     assert res.success is False
     assert res.reason == "no_bug"
     mmin.assert_not_called()        # 没最小化
+
+
+def test_reproduce_passes_project_dir_as_cwd(tmp_path):
+    # graph 串联时传 project_dir：runner 必须收到 cwd（否则 playwright No tests found）
+    tl = _timeline()
+    proj = str(tmp_path)
+    run_n = MagicMock(return_value=RunTimesResult(
+        pass_count=0, fail_count=3, results=[RunResult(False)] * 3))
+    run_t = MagicMock(return_value=RunResult(False))
+    with patch("agents.reproduction.chat", return_value="spec"), \
+         patch("agents.reproduction.minimize") as mmin:
+        mmin.return_value = MagicMock(original_count=1, minimized_count=1, removed_count=0)
+        reproduce(tl, run_test_fn=run_t, run_n_fn=run_n, project_dir=proj)
+    _, kwargs = run_n.call_args
+    assert kwargs.get("cwd") == proj
