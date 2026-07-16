@@ -107,49 +107,63 @@ def fix_locator(spec_code, error_msg):
 
 
 def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_dir=None):
-    """主流程：生成测试 → 连跑判稳定 → 修定位器（≤2 轮）→ 最小复现。"""
+    """主流程：生成测试 → 连跑判稳定 → 修定位器（≤2 轮）→ 最小复现。
+    结束自动清理生成的 spec 临时文件（避免污染被测项目 / code_search）。"""
     run_test_fn = run_test_fn or _default_run_test
     run_n_fn = run_n_fn or _default_run_n
     # spec 写进被测项目目录（playwright 要求 testDir 内 + cwd），否则 No tests found
     spec_dir = project_dir or workdir or tempfile.gettempdir()
     cwd = project_dir
+    written = []
+
+    def _write(code):
+        p = _write_spec(code, spec_dir)
+        written.append(p)
+        return p
+
     steps = _events_to_steps(timeline)
     spec_code = generate_test(steps, timeline.expected, timeline.actual)
-    spec_path = _write_spec(spec_code, spec_dir)
+    spec_path = _write(spec_code)
+    try:
+        rounds = 0
+        last = None
+        stable = False
+        for _ in range(3):                       # 1 次初始 + 最多 2 轮修定位器
+            last = run_n_fn(spec_path, 3, cwd=cwd)
+            if last.stable_fail:
+                stable = True
+                break
+            if last.pass_count == len(last.results):
+                return ReproductionResult(success=False, spec_code=spec_code, spec_path=spec_path,
+                                          rounds=rounds, reason="no_bug")
+            if rounds >= 2:
+                break
+            spec_code = fix_locator(spec_code, _extract_error(last))
+            spec_path = _write(spec_code)
+            rounds += 1
 
-    rounds = 0
-    last = None
-    stable = False
-    for _ in range(3):                       # 1 次初始 + 最多 2 轮修定位器
-        last = run_n_fn(spec_path, 3, cwd=cwd)
-        if last.stable_fail:
-            stable = True
-            break
-        if last.pass_count == len(last.results):
+        if not stable:
             return ReproductionResult(success=False, spec_code=spec_code, spec_path=spec_path,
-                                      rounds=rounds, reason="no_bug")
-        if rounds >= 2:
-            break
-        spec_code = fix_locator(spec_code, _extract_error(last))
-        spec_path = _write_spec(spec_code, spec_dir)
-        rounds += 1
+                                      rounds=rounds, reason="unstable")
 
-    if not stable:
-        return ReproductionResult(success=False, spec_code=spec_code, spec_path=spec_path,
-                                  rounds=rounds, reason="unstable")
+        # 最小复现：删候选步骤后用子集重新生成 spec 再跑
+        def min_runner(subset):
+            sub_code = generate_test(subset, timeline.expected, timeline.actual)
+            return run_test_fn(_write(sub_code), cwd=cwd)
 
-    # 最小复现：删候选步骤后用子集重新生成 spec 再跑
-    def min_runner(subset):
-        sub_code = generate_test(subset, timeline.expected, timeline.actual)
-        return run_test_fn(_write_spec(sub_code, spec_dir), cwd=cwd)
-
-    minimized = minimize(steps, min_runner)
-    return ReproductionResult(
-        success=True,
-        spec_code=spec_code,
-        spec_path=spec_path,
-        minimized=minimized,
-        stable_rate=f"{last.fail_count}/{len(last.results)}",
-        rounds=rounds,
-        reason="stable_repro",
-    )
+        minimized = minimize(steps, min_runner)
+        return ReproductionResult(
+            success=True,
+            spec_code=spec_code,
+            spec_path=spec_path,
+            minimized=minimized,
+            stable_rate=f"{last.fail_count}/{len(last.results)}",
+            rounds=rounds,
+            reason="stable_repro",
+        )
+    finally:
+        for p in written:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
