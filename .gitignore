@@ -6,10 +6,15 @@ __pycache__/
 # Node
 node_modules/
 
+# Playwright 产物（demo_project）
+demo_project/test-results/
+demo_project/playwright-report/
+
 # Spike 产物
 out/
 spike/sample.wav
 spike/generated_test.spec.ts
+spike/smoke_generated.spec.ts
 
 # 密钥
 .env
