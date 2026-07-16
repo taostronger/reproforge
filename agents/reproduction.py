@@ -106,19 +106,22 @@ def fix_locator(spec_code, error_msg):
     return chat([{"role": "user", "content": prompt}])
 
 
-def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None):
+def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_dir=None):
     """主流程：生成测试 → 连跑判稳定 → 修定位器（≤2 轮）→ 最小复现。"""
     run_test_fn = run_test_fn or _default_run_test
     run_n_fn = run_n_fn or _default_run_n
+    # spec 写进被测项目目录（playwright 要求 testDir 内 + cwd），否则 No tests found
+    spec_dir = project_dir or workdir or tempfile.gettempdir()
+    cwd = project_dir
     steps = _events_to_steps(timeline)
     spec_code = generate_test(steps, timeline.expected, timeline.actual)
-    spec_path = _write_spec(spec_code, workdir)
+    spec_path = _write_spec(spec_code, spec_dir)
 
     rounds = 0
     last = None
     stable = False
     for _ in range(3):                       # 1 次初始 + 最多 2 轮修定位器
-        last = run_n_fn(spec_path, 3)
+        last = run_n_fn(spec_path, 3, cwd=cwd)
         if last.stable_fail:
             stable = True
             break
@@ -128,7 +131,7 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None):
         if rounds >= 2:
             break
         spec_code = fix_locator(spec_code, _extract_error(last))
-        spec_path = _write_spec(spec_code, workdir)
+        spec_path = _write_spec(spec_code, spec_dir)
         rounds += 1
 
     if not stable:
@@ -138,7 +141,7 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None):
     # 最小复现：删候选步骤后用子集重新生成 spec 再跑
     def min_runner(subset):
         sub_code = generate_test(subset, timeline.expected, timeline.actual)
-        return run_test_fn(_write_spec(sub_code, workdir))
+        return run_test_fn(_write_spec(sub_code, spec_dir), cwd=cwd)
 
     minimized = minimize(steps, min_runner)
     return ReproductionResult(
