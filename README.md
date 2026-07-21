@@ -90,6 +90,30 @@ python -m ui.app   # http://localhost:7860
 
 业务代码零改动，只换 `base_url` + `model`（Stepfun 与本地 vLLM/llama-server 都是 OpenAI 兼容）。
 
+## 本地部署（DGX Spark）
+
+评审期的"本地算力部署"由 `PROFILE=local` 一键切换，业务代码零改动——这是本项目的平台适配核心。
+
+**部署形态**（spark-71，1× NVIDIA GB10 Grace Blackwell，128 GB 统一内存）：
+
+- 本地模型：vLLM 托管 `qwen3.6-35b`（fp8 量化，TP=1，util≈0.4），OpenAI 兼容 endpoint `http://spark-71:8000/v1`
+- 开发机经 SSH 隧道访问该 endpoint（配置见 `ssh信息/spark-71-连接指南.md`）
+- `config.py` 读取 `LOCAL_BASE_URL` / `LOCAL_MODEL` / `LOCAL_API_KEY`，默认指向上述 endpoint
+
+```bash
+# 1. 在 DGX Spark 上起 vLLM 服务（OpenAI 兼容）
+vllm serve /models/qwen36-35b-a3b \
+  --port 8000 --tensor-parallel-size 1 --quantization fp8
+
+# 2. 建立 SSH 隧道，把 spark-71:8000 映射到本地
+ssh -L 8000:localhost:8000 -p 6071 Developer@106.13.186.155
+
+# 3. 切到本地模型跑端到端（与远程 API 同一份代码）
+PROFILE=local python spike/smoke_phase3.py
+```
+
+**远程(Stepfun) vs 本地(qwen3.6) 对比**：`eval/compare.py` 对同一批 Bug 用两个 PROFILE 各跑一遍 `run_pipeline`，汇总四个维度——复现成功率 / 测试生成成功率 / 最小化率 / 定位器修复轮数。切 PROFILE 时重置 LLM 客户端单例，避免 `base_url` 缓存导致切换不生效。
+
 ## 评测
 
 `eval/metrics.py` 在多个 Bug 上跑全流程，汇总：复现成功率 / 测试生成成功率 / 最小化率 / 定位器修复轮数。
@@ -99,9 +123,22 @@ python -m ui.app   # http://localhost:7860
 - **降级链贯穿全程**：evidence 低置信度 → 需人工确认；reproduction 不稳定 → 2 轮定位器修复上限；code_search 无 ripgrep → 纯 Python 遍历；regression LLM 不可用 → 确定性 fallback Issue。
 - **冒烟驱动**：4 个 mock 测试漏掉的真实 bug（代码围栏 / 漏 import / 路径正则 / 编码 / 测试产物污染）均由真调端到端冒烟发现并修复。
 
-## 团队
+## 团队分工与贡献
 
-**taostronger 团队**：开发（架构 / 编码 / 测试）+ 非编码成员（素材录制 / 审美把控 / 视频 / 路演）
+**taostronger**（2 人队，实际产能 = 1 名开发者，故 MVP 按单人可完成设计、每个功能配降级兜底）
+
+| 成员 | 角色 | 贡献 |
+|---|---|---|
+| tz（队长） | 主力开发 | 整体架构设计；4 个 LLM Agent（evidence / reproduction / code_investigator / regression）实现；LangGraph StateGraph 工作流编排；**最小复现算法**（核心创新）设计与实现；Playwright 测试运行器与连跑判稳定；ripgrep + tree-sitter 检索；双轨模型抽象层；DGX Spark 本地 vLLM 部署；全部 pytest 用例（43 过 / 2 skip）与端到端冒烟；README 与文档 |
+| liwenY | 非技术辅助 | 被测商城的 Bug 场景与素材设计；Demo 视频录制与剪辑；界面审美把控；路演材料与现场协助 |
+
+## 未来展望
+
+- **Bug 类型扩展**：从价格计算类 Bug 扩展到表单校验、异步加载、跨页面状态等更复杂场景
+- **CI 集成**：生成的回归测试自动接入 GitHub Actions，Bug 修复后自动验证"是否真的修好"
+- **多模态证据**：在操作回放基础上加入截图 diff 与 DOM 快照，让证据链更直观
+- **最小复现增强**：用代码覆盖率指导删步（优先删覆盖重叠的步骤），进一步压短最小复现路径
+- **框架无关化**：把 Playwright 之外的后端 API、移动端纳入复现范围
 
 ---
 
