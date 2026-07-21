@@ -58,10 +58,9 @@ def build_app():
     theme = gr.themes.Soft(
         primary_hue="emerald",
         neutral_hue="slate",
-        font=["Noto Sans SC", "PingFang SC", "Microsoft YaHei", "sans-serif"],
-        font_mono=["JetBrains Mono", "Consolas", "monospace"],
     )
     css = """
+    .gradio-container { font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
     .rf-header { text-align: center; padding: 10px 0 6px; }
     .rf-title { font-size: 2.3em; font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
     .rf-sub { color: #64748b; font-size: 0.95em; margin-top: 4px; }
