@@ -9,9 +9,19 @@ from pathlib import Path
 
 from asr.transcribe import Segment
 from graph.workflow import run_pipeline
+from capture.recorder import record_user_session
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_PROJECT = str(_REPO_ROOT / "demo_project")
+DEMO_URL = "http://localhost:5173"   # 被测商城（录制操作时弹出）
+
+
+def record_actions_fn():
+    """点录制 → 弹出商城浏览器 → 用户操作后点页面右上角「完成录制」→ actions 填回 JSON 框。"""
+    actions = record_user_session(DEMO_URL, timeout=90)
+    if not actions:
+        return "[]  # 未录到操作（没操作 / 浏览器提前关）"
+    return json.dumps(actions, ensure_ascii=False, indent=2)
 
 DEMO_ACTIONS = json.dumps([
     {"type": "fill", "target": "coupon-input", "value": "SALE20", "timestamp": 1.0, "text": "优惠码"},
@@ -74,11 +84,13 @@ def build_app():
             '<div class="rf-pipeline">vision → evidence → reproduction → recall → investigator → regression</div>'
             '</div>'
         )
+        record_btn = gr.Button("🎬 录制操作（弹浏览器操作商城，完事点页面「完成录制」）", size="sm")
         with gr.Row():
-            actions_json = gr.Textbox(label="操作步骤 JSON", value=DEMO_ACTIONS, lines=12, scale=2)
+            actions_json = gr.Textbox(label="操作步骤 JSON（可点上方按钮真实录制）", value=DEMO_ACTIONS, lines=12, scale=2)
             with gr.Column(scale=1):
                 narration = gr.Textbox(label="口述（模拟 ASR 转写）", value=DEMO_NARRATION, lines=3)
                 screenshot = gr.Image(label="Bug 截图（可选，VL 视觉）", type="filepath")
+        record_btn.click(record_actions_fn, [], [actions_json])
         with gr.Accordion("高级（项目目录 / 代码检索）", open=False):
             with gr.Row():
                 project_dir = gr.Textbox(label="被测项目目录", value=DEMO_PROJECT, scale=2)
