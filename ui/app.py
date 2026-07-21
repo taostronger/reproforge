@@ -22,7 +22,7 @@ DEMO_ACTIONS = json.dumps([
 DEMO_NARRATION = "我用了一张八折优惠券，然后把数量改成2，结果总价还是80，应该是160才对"
 
 
-def run_pipeline_ui(actions_json, narration, project_dir, repo_path):
+def run_pipeline_ui(actions_json, narration, project_dir, repo_path, screenshot=None):
     """UI 业务函数：解析输入 → run_pipeline → (issue_body, summary_md, spec_code)。可独立测试。"""
     try:
         actions = json.loads(actions_json)
@@ -31,7 +31,8 @@ def run_pipeline_ui(actions_json, narration, project_dir, repo_path):
     segments = [Segment(text=narration, start=0.0, end=10.0)] if narration else []
     proj = (project_dir or "").strip() or None
     rp = (repo_path or "").strip() or proj or DEMO_PROJECT
-    state = run_pipeline(actions, segments, console_log=[], repo_path=rp, project_dir=proj)
+    state = run_pipeline(actions, segments, console_log=[], repo_path=rp, project_dir=proj,
+                         screenshot=screenshot)
     tl = state["timeline"]
     repro = state["repro_result"]
     top = state["top_files"]
@@ -42,6 +43,13 @@ def run_pipeline_ui(actions_json, narration, project_dir, repo_path):
         f"定位器修复={repro.rounds} 轮，原因={repro.reason}\n"
         f"- **可疑文件 Top3**：{', '.join(Path(f.path).name for f in top.files) or '(无)'}"
     )
+    vf = state.get("visual_finding")
+    if vf is not None and getattr(vf, "used", False):
+        summary += (
+            "\n### VL 视觉（看截图）\n"
+            f"- 预期/实际：{vf.expected} / {vf.actual}（置信度 {vf.confidence:.2f}）\n"
+            f"- 页面描述：{vf.page_description or '(无)'}"
+        )
     return state["issue"].body, summary, repro.spec_code
 
 
@@ -56,11 +64,12 @@ def build_app():
         with gr.Row():
             project_dir = gr.Textbox(label="被测项目目录（spec 写入 + playwright cwd）", value=DEMO_PROJECT)
             repo_path = gr.Textbox(label="代码检索目录（留空同上）", value="")
+        screenshot = gr.Image(label="Bug 截图（可选，VL 视觉分析）", type="filepath")
         btn = gr.Button("运行复现流水线", variant="primary")
         summary = gr.Markdown()
         issue_md = gr.Markdown(label="生成的 Issue")
         spec_code = gr.Code(label="生成的 Playwright 测试", language="typescript")
-        btn.click(run_pipeline_ui, [actions_json, narration, project_dir, repo_path],
+        btn.click(run_pipeline_ui, [actions_json, narration, project_dir, repo_path, screenshot],
                   [issue_md, summary, spec_code])
     return app
 
