@@ -28,3 +28,15 @@ def chat_json(messages, model=None):
     if match:
         return json.loads(match.group())
     raise ValueError("No valid JSON found in response")
+
+
+def chat_vision(messages, model=None):
+    """多模态调用（messages 的 content 可含 image_url），复用 chat 透传 + 提取 JSON。
+
+    OpenAI 兼容接口支持 content 为 list（text + image_url），chat() 直接透传，无需改。
+    """
+    content = chat(messages, model=model, temperature=0.1)
+    match = re.search(r'\{.*\}', content, re.S)
+    if match:
+        return json.loads(match.group())
+    raise ValueError("No valid JSON in vision response")
