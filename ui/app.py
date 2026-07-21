@@ -55,20 +55,40 @@ def run_pipeline_ui(actions_json, narration, project_dir, repo_path, screenshot=
 
 def build_app():
     import gradio as gr
-    with gr.Blocks(title="ReproForge") as app:
-        gr.Markdown("# ReproForge — Bug 复现与回归智能体\n"
-                    "大模型理解 Bug，Playwright 证明 Bug。输入操作步骤 + 口述，自动复现并生成 Issue。")
+    theme = gr.themes.Soft(
+        primary_hue="emerald",
+        neutral_hue="slate",
+        font=["Noto Sans SC", "PingFang SC", "Microsoft YaHei", "sans-serif"],
+        font_mono=["JetBrains Mono", "Consolas", "monospace"],
+    )
+    css = """
+    .rf-header { text-align: center; padding: 10px 0 6px; }
+    .rf-title { font-size: 2.3em; font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+    .rf-sub { color: #64748b; font-size: 0.95em; margin-top: 4px; }
+    .rf-pipeline { color: #10b981; font-family: 'JetBrains Mono', monospace; font-size: 0.82em; margin-top: 8px; letter-spacing: 0.02em; }
+    """
+    with gr.Blocks(title="ReproForge — Bug 复现与回归智能体", theme=theme, css=css) as app:
+        gr.HTML(
+            '<div class="rf-header">'
+            '<div class="rf-title">🔧 ReproForge</div>'
+            '<div class="rf-sub">大模型理解 Bug，Playwright 证明 Bug · 多模态视觉 + 历史记忆</div>'
+            '<div class="rf-pipeline">vision → evidence → reproduction → recall → investigator → regression</div>'
+            '</div>'
+        )
         with gr.Row():
-            actions_json = gr.Textbox(label="操作步骤 JSON", value=DEMO_ACTIONS, lines=10)
-            narration = gr.Textbox(label="口述（模拟 ASR 转写）", value=DEMO_NARRATION, lines=4)
-        with gr.Row():
-            project_dir = gr.Textbox(label="被测项目目录（spec 写入 + playwright cwd）", value=DEMO_PROJECT)
-            repo_path = gr.Textbox(label="代码检索目录（留空同上）", value="")
-        screenshot = gr.Image(label="Bug 截图（可选，VL 视觉分析）", type="filepath")
-        btn = gr.Button("运行复现流水线", variant="primary")
+            actions_json = gr.Textbox(label="操作步骤 JSON", value=DEMO_ACTIONS, lines=12, scale=2)
+            with gr.Column(scale=1):
+                narration = gr.Textbox(label="口述（模拟 ASR 转写）", value=DEMO_NARRATION, lines=3)
+                screenshot = gr.Image(label="Bug 截图（可选，VL 视觉）", type="filepath")
+        with gr.Accordion("高级（项目目录 / 代码检索）", open=False):
+            with gr.Row():
+                project_dir = gr.Textbox(label="被测项目目录", value=DEMO_PROJECT, scale=2)
+                repo_path = gr.Textbox(label="代码检索目录（留空同上）", value="", scale=2)
+        btn = gr.Button("▶ 运行复现流水线", variant="primary", size="lg")
         summary = gr.Markdown()
-        issue_md = gr.Markdown(label="生成的 Issue")
-        spec_code = gr.Code(label="生成的 Playwright 测试", language="typescript")
+        with gr.Row():
+            issue_md = gr.Markdown(label="生成的 Issue", scale=1)
+            spec_code = gr.Code(label="生成的 Playwright 测试", language="typescript", scale=1)
         btn.click(run_pipeline_ui, [actions_json, narration, project_dir, repo_path, screenshot],
                   [issue_md, summary, spec_code])
     return app
