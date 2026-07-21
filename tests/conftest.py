@@ -7,6 +7,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 os.environ.setdefault("STEPCONFIG_FUN_API_KEY", "test-placeholder")
+os.environ.setdefault("REPROFORGE_MEMORY", "off")   # 测试默认关记忆，避免 bge 下载（recall 走 store=None 降级）
 
 
 @pytest.fixture(autouse=True)

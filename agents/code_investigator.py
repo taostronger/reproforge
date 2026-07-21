@@ -32,6 +32,9 @@ Bug：预期 {expected}，实际 {actual}
 候选文件（按命中数排序）：
 {candidates}
 
+相似历史 Bug 参考（仅作线索，不视为结论）：
+{historical_ref}
+
 请对每个候选文件打分（0-1，越高越可疑）并给一句话理由。只输出 JSON：
 {{"scores": [{{"score": 0.9, "reason": "一句话理由"}}, ...]}}
 scores 数组顺序与上面候选文件顺序一一对应。"""
@@ -64,7 +67,18 @@ def _extract_query_terms(timeline, console_errors):
     return uniq
 
 
-def investigate(timeline, console_errors, repo_path, top_n=3):
+def _format_historical_ref(historical_ref):
+    """历史 Bug 参考格式化为 prompt 文本；无/未用 → '(无)'。"""
+    if historical_ref is None or not getattr(historical_ref, "used", False):
+        return "(无)"
+    lines = []
+    for i, it in enumerate(historical_ref.items[:3], 1):
+        m = it.get("metadata", {}) or {}
+        lines.append(f"{i}. 预期{m.get('expected', '')} 实际{m.get('actual', '')} 可疑:{m.get('suspected', '')}")
+    return "\n".join(lines) or "(无)"
+
+
+def investigate(timeline, console_errors, repo_path, top_n=3, historical_ref=None):
     """检索候选文件 → LLM 打分排序 → TopFiles（不宣称根因，只排序）。"""
     terms = _extract_query_terms(timeline, console_errors)
     hits = search(terms, repo_path, top_n=10)
@@ -79,6 +93,7 @@ def investigate(timeline, console_errors, repo_path, top_n=3):
     prompt = _RANK_PROMPT.format(
         expected=timeline.expected, actual=timeline.actual,
         actions=actions_desc, candidates=candidates_desc,
+        historical_ref=_format_historical_ref(historical_ref),
     )
     try:
         result = chat_json([{"role": "user", "content": prompt}]) or {}
