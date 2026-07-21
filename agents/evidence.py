@@ -57,7 +57,7 @@ def _looks_anomalous(narration):
     return bool(narration) and any(w in narration for w in _ANOMALY_WORDS)
 
 
-def build_timeline(actions, segments, console_log=None):
+def build_timeline(actions, segments, console_log=None, visual_finding=None):
     """构建 Bug 时间线：关联 narration + LLM 提取 expected/actual + 标可疑异常。"""
     console_log = console_log or []
     events = []
@@ -86,5 +86,17 @@ def build_timeline(actions, segments, console_log=None):
         conf = float(result.get("confidence", 0.0) or 0.0)
     except (TypeError, ValueError):
         conf = 0.0
-    needs_confirm = conf < _CONFIDENCE_THRESHOLD or (not expected and not actual)
+    # 合并 VL 视觉提取（置信度优先；口述与视觉冲突 → 转人工确认）
+    vision_conflict = False
+    if visual_finding is not None and getattr(visual_finding, "used", False):
+        if visual_finding.confidence >= conf:
+            if visual_finding.expected:
+                expected = visual_finding.expected
+            if visual_finding.actual:
+                actual = visual_finding.actual
+            conf = visual_finding.confidence
+        elif ((visual_finding.expected and expected and visual_finding.expected != expected) or
+              (visual_finding.actual and actual and visual_finding.actual != actual)):
+            vision_conflict = True
+    needs_confirm = vision_conflict or conf < _CONFIDENCE_THRESHOLD or (not expected and not actual)
     return BugTimeline(events=events, expected=expected, actual=actual, needs_confirm=needs_confirm)
