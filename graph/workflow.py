@@ -1,7 +1,8 @@
 """graph/workflow.py — LangGraph 编排
 
-StateGraph 串联 vision → evidence → reproduction → investigator → regression。
+StateGraph 串联 vision → evidence → reproduction → recall → investigator → regression。
 - vision（VL，可选）：看截图提 expected/actual，无图/REPROFORGE_VL=off/调用失败 → 返回空（降级）
+- recall（RAG，可选）：检索历史相似 Bug 给 investigator 参考；空库/REPROFORGE_MEMORY=off/失败 → 降级
 编排层接受已解析的 actions/segments（解耦采集层 trace_parser，后者未实现）。
 """
 import os
@@ -12,8 +13,10 @@ from langgraph.graph import START, END, StateGraph
 from agents.vision import analyze_screenshot, VisualFinding
 from agents.evidence import build_timeline
 from agents.reproduction import reproduce
+from agents.recall import recall
 from agents.code_investigator import investigate
 from agents.regression import review
+from memory.store import get_memory_store
 
 
 class State(TypedDict, total=False):
@@ -28,6 +31,7 @@ class State(TypedDict, total=False):
     repro_result: Any
     top_files: Any
     issue: Any
+    historical_ref: Any               # RAG：recall 输出（HistoricalRef）
 
 
 def vision_node(state):
@@ -50,8 +54,16 @@ def reproduction_node(state):
     return {"repro_result": repro}
 
 
+def recall_node(state):
+    """RAG：检索历史相似 Bug。无库/失败 → 空 HistoricalRef（investigator 照旧）。"""
+    store = get_memory_store()
+    ref = recall(state["timeline"], state["actions"], store=store)
+    return {"historical_ref": ref}
+
+
 def investigator_node(state):
-    top = investigate(state["timeline"], state["console_log"], state["repo_path"])
+    top = investigate(state["timeline"], state["console_log"], state["repo_path"],
+                      historical_ref=state.get("historical_ref"))
     return {"top_files": top}
 
 
@@ -67,19 +79,24 @@ def build_graph():
     g.add_node("vision", vision_node)
     g.add_node("evidence", evidence_node)
     g.add_node("reproduction", reproduction_node)
+    g.add_node("recall", recall_node)
     g.add_node("investigator", investigator_node)
     g.add_node("regression", regression_node)
     g.add_edge(START, "vision")
     g.add_edge("vision", "evidence")
     g.add_edge("evidence", "reproduction")
-    g.add_edge("reproduction", "investigator")
+    g.add_edge("reproduction", "recall")
+    g.add_edge("recall", "investigator")
     g.add_edge("investigator", "regression")
     g.add_edge("regression", END)
     return g.compile()
 
 
 def run_pipeline(actions, segments, console_log=None, repo_path=".", project_dir=None, screenshot=None):
-    """端到端编排：截图(可选) + actions + segments → vision → 时间线 → 复现 → 代码调查 → 回归 Issue。"""
+    """端到端编排：截图(可选) + actions + segments → vision → 时间线 → 复现 → 检索历史 → 代码调查 → 回归 Issue。
+
+    结束后把 Issue ingest 进记忆库（失败不影响输出）。
+    """
     graph = build_graph()
     initial = {
         "actions": actions,
@@ -89,4 +106,23 @@ def run_pipeline(actions, segments, console_log=None, repo_path=".", project_dir
         "project_dir": project_dir,
         "screenshot": screenshot,
     }
-    return graph.invoke(initial)
+    state = graph.invoke(initial)
+    _ingest_to_memory(state)
+    return state
+
+
+def _ingest_to_memory(state):
+    """Issue 入记忆库；REPROFORGE_MEMORY=off / 无 issue / 失败 → 静默跳过。"""
+    if os.getenv("REPROFORGE_MEMORY", "on").lower() == "off":
+        return
+    issue = state.get("issue")
+    timeline = state.get("timeline")
+    top_files = state.get("top_files")
+    if issue is None or timeline is None:
+        return
+    try:
+        store = get_memory_store()
+        if store is not None:
+            store.ingest_issue(issue, timeline, top_files)
+    except Exception:
+        pass
