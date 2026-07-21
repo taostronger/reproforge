@@ -130,7 +130,7 @@ PROFILE=local python spike/smoke_phase3.py
 | 成员 | 角色 | 贡献 |
 |---|---|---|
 | tz（队长） | 主力开发 | 整体架构设计；4 个 LLM Agent（evidence / reproduction / code_investigator / regression）实现；LangGraph StateGraph 工作流编排；**最小复现算法**（核心创新）设计与实现；Playwright 测试运行器与连跑判稳定；ripgrep + tree-sitter 检索；双轨模型抽象层；DGX Spark 本地 vLLM 部署；全部 pytest 用例（43 过 / 2 skip）与端到端冒烟；README 与文档 |
-| liwenY | 非技术辅助 | 被测商城的 Bug 场景与素材设计；Demo 视频录制与剪辑；界面审美把控；路演材料与现场协助 |
+| liwenY（队员） | 非技术辅助 | 被测商城的 Bug 场景与素材设计；Demo 视频录制与剪辑；界面审美把控；路演材料与现场协助 |
 
 ## 未来展望
 
