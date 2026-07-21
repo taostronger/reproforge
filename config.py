@@ -24,3 +24,15 @@ def get_model_config() -> ModelConfig:
         model=os.getenv("STEPFUN_MODEL", "step-3.7-flash"),
         api_key=os.environ["STEPCONFIG_FUN_API_KEY"],
     )
+
+
+def get_vl_model_config() -> ModelConfig:
+    """VL 视觉固定走远程 step-3.7 多模态（本地 qwen3.6 不支持图像，故 VL 不随 PROFILE 切）。
+
+    双轨：本地 VL（Qwen2.5-VL）留决赛补；预赛 VL 始终远程 step-3.7。
+    """
+    return ModelConfig(
+        base_url="https://api.stepfun.com/step_plan/v1",
+        model=os.getenv("VL_MODEL", "step-3.7-flash"),
+        api_key=os.environ["STEPCONFIG_FUN_API_KEY"],
+    )
