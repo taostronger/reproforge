@@ -17,7 +17,7 @@
 ### 1.2 目标
 构建一个多模态 Bug 复现与回归智能体：输入「截图 / 视频 / 语音 + 操作 + 口述」，输出
 1. 可运行的 Playwright 回归测试（带断言、连跑稳定）；
-2. 最小复现路径（最短稳定复现序列）；
+2. 最小复现路径（稳定 1-minimal 复现序列）；
 3. 可交付的 Markdown Bug Issue；
 4. （可选）历史相似 Bug 参考与可疑代码排序。
 
@@ -60,7 +60,7 @@ ReproForge 用**大模型理解 Bug**（多模态提意图）+ **Playwright 证�
 - **真·多模态**：语音（whisper）+ 操作（Playwright）+ 视觉（VL 看截图）+ 文本（LLM）四位一体；
 - **会记忆**：历史 Bug 入向量库，新 Bug 检索相似案例辅助定位；
 - **本地为主 + 远程加固**：三服务全本地（DGX Spark），远程 Stepfun 作 fallback；
-- **全降级**：VL / RAG / 录制 / 视频 / 任一服务挂掉 → 主流水线照跑，零退化；
+- **优雅降级**：VL / RAG / 录制 / 视频 / 任一服务挂掉 → 核心复现链路照跑，并明确标记缺失证据与能力降级（不宣称零退化）；
 - **商城 ↔ 工具跳转**：商城 🐞 Report Bug → ReproForge，闭环演示。
 
 ---
@@ -68,7 +68,7 @@ ReproForge 用**大模型理解 Bug**（多模态提意图）+ **Playwright 证�
 ## 三、技术创新点
 
 ### 3.1 最小复现算法（核心创新，确定性）
-拿到能稳定复现的测试后，求**最短稳定复现路径**：逐个尝试删除「候选可删步骤」（click/hover 类无关步骤，保留关键填写），删后用子集重新生成 spec **真跑**，Bug 仍在则永久删除，否则保留，重复直到无可删。
+拿到能稳定复现的测试后，求**稳定 1-minimal 复现路径**（任一剩余步骤都无法再单独删除，不保证全局最短）：逐个尝试删除「候选可删步骤」（click/hover 类无关步骤，保留关键填写），删后用子集重新生成 spec **真跑**，Bug 仍在则永久删除，否则保留，重复直到无可删。
 
 > **纯确定性算法，不依赖 LLM 猜**。开发者拿到最小步骤，照着点几下就能复现，不用在十几步无关操作里找。
 
@@ -92,7 +92,7 @@ ReproForge 用**大模型理解 Bug**（多模态提意图）+ **Playwright 证�
 ## 四、NVIDIA SDK / 模型使用说明
 
 ### 4.1 平台：NVIDIA DGX Spark（GB10 Grace Blackwell）
-- 配置：1× GB10（128GB 统一内存）/ 119GB RAM / 20 核 / 3.7TB NVMe；
+- 配置：1× GB10（128GB LPDDR5x 统一内存，系统显示 ~119GiB）/ 20 核 / 3.7TB NVMe；
 - 充分利用本地算力部署三服务，满足「本地算力部署」评审要求。
 
 ### 4.2 推理：vLLM（OpenAI 兼容，nightly v0.23.1rc1）
@@ -118,7 +118,7 @@ ReproForge 用**大模型理解 Bug**（多模态提意图）+ **Playwright 证�
 用 LangGraph StateGraph 线性串联 6 节点，与 NVIDIA 官方 AI-Q 深度研究 Blueprint（Intent Router → 子代理 → Sandbox + Tools）同形态。
 
 ### 4.5 其他 SDK / 技能
-- **Playwright**：录制操作 + reproduction 真实回放（Secure Runtime 沙箱，确定性证明 Bug）；
+- **Playwright**：录制操作 + reproduction 真实回放（隔离执行环境，确定性证明 Bug）；
 - **faster-whisper**（CPU int8）：ASR，不占 GPU；
 - **ripgrep + tree-sitter**：代码检索 skill；
 - **chromadb**：RAG 向量库。
