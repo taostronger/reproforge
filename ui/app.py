@@ -7,6 +7,9 @@ run_pipeline_ui 为业务函数（不依赖 gradio，可独立测试）；build_
 import json
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()  # 读 .env（演示态 LOCAL_*/EMBEDDING_BASE_URL，启用本地三服务 + RAG）
+
 from asr.transcribe import Segment, transcribe
 from graph.workflow import run_pipeline
 from capture.recorder import record_user_session
@@ -54,8 +57,9 @@ def list_memory_fn():
     """查记忆库所有历史 Bug Issue → 展示。"""
     store = get_memory_store()
     if store is None:
-        return ("📚 记忆库（RAG）随复现自动积累历史 Bug，新 Bug 时 recall 节点检索相似案例辅助定位。\n\n"
-                "_bge embedding 服务部署在 DGX Spark（torch 2.11）；本地 demo 未 ingest 历史数据，决赛补真实记忆。_")
+        return ("📚 记忆库（RAG）未启用：`EMBEDDING_BASE_URL` 未配置或 bge 服务(:8002)不通。\n\n"
+                "复现过的 Bug 自动入库；新 Bug 时 recall 节点检索相似案例辅助定位。"
+                "演示态请在 `.env` 设 `EMBEDDING_BASE_URL=http://localhost:8002` 并确保隧道/服务就绪。")
     items = store.list_all()
     if not items:
         return "记忆库为空 —— 跑几次复现（生成 Issue）后会自动存入，再回来刷新。"
