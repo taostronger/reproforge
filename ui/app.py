@@ -10,6 +10,7 @@ from pathlib import Path
 from asr.transcribe import Segment
 from graph.workflow import run_pipeline
 from capture.recorder import record_user_session
+from capture.video_parser import parse_video
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_PROJECT = str(_REPO_ROOT / "demo_project")
@@ -22,6 +23,18 @@ def record_actions_fn():
     if not actions:
         return "[]  # 未录到操作（没操作 / 浏览器提前关）"
     return json.dumps(actions, ensure_ascii=False, indent=2)
+
+
+def parse_video_fn(video_path):
+    """点「从视频生成」→ 解析视频 → 填回 actions / narration / screenshot。"""
+    if not video_path:
+        return None, None, None, "⚠️ 请先上传视频"
+    actions, narration, screenshot = parse_video(video_path)
+    actions_json = (json.dumps(actions, ensure_ascii=False, indent=2)
+                    if actions else "[]  # 未提取到操作（检查视频是否有清晰口述）")
+    msg = (f"✓ 视频解析完成：{len(actions)} 步操作，口述 {len(narration)} 字"
+           + ("，截图已抽帧" if screenshot else ""))
+    return actions_json, narration, screenshot, msg
 
 DEMO_ACTIONS = json.dumps([
     {"type": "fill", "target": "coupon-input", "value": "SALE20", "timestamp": 1.0, "text": "优惠码"},
@@ -85,12 +98,16 @@ def build_app():
             '</div>'
         )
         record_btn = gr.Button("🎬 录制操作（弹浏览器操作商城，完事点页面「完成录制」）", size="sm")
+        video_in = gr.Video(label="上传操作视频（可选 → 点下方按钮自动生成 actions / 口述 / 截图）")
+        parse_btn = gr.Button("🎬 从视频生成（解析操作 + 口述 + 截图）", size="sm")
+        parse_msg = gr.Markdown()
         with gr.Row():
             actions_json = gr.Textbox(label="操作步骤 JSON（可点上方按钮真实录制）", value=DEMO_ACTIONS, lines=12, scale=2)
             with gr.Column(scale=1):
                 narration = gr.Textbox(label="口述（模拟 ASR 转写）", value=DEMO_NARRATION, lines=3)
                 screenshot = gr.Image(label="Bug 截图（可选，VL 视觉）", type="filepath")
         record_btn.click(record_actions_fn, [], [actions_json])
+        parse_btn.click(parse_video_fn, [video_in], [actions_json, narration, screenshot, parse_msg])
         with gr.Accordion("高级（项目目录 / 代码检索）", open=False):
             with gr.Row():
                 project_dir = gr.Textbox(label="被测项目目录", value=DEMO_PROJECT, scale=2)
