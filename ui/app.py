@@ -7,7 +7,7 @@ run_pipeline_ui 为业务函数（不依赖 gradio，可独立测试）；build_
 import json
 from pathlib import Path
 
-from asr.transcribe import Segment
+from asr.transcribe import Segment, transcribe
 from graph.workflow import run_pipeline
 from capture.recorder import record_user_session
 from capture.video_parser import parse_video
@@ -35,6 +35,18 @@ def parse_video_fn(video_path):
     msg = (f"✓ 视频解析完成：{len(actions)} 步操作，口述 {len(narration)} 字"
            + ("，截图已抽帧" if screenshot else ""))
     return actions_json, narration, screenshot, msg
+
+
+def audio_to_narration_fn(audio_path):
+    """录音/上传音频 → faster-whisper ASR → 口述文本。"""
+    if not audio_path:
+        return None, "⚠️ 请先录音或上传音频"
+    try:
+        segs = transcribe(audio_path)
+        narration = " ".join(s.text for s in segs).strip()
+        return narration, f"✓ 语音转写完成（{len(narration)} 字）"
+    except Exception as e:
+        return None, f"⚠️ ASR 失败：{e}"
 
 DEMO_ACTIONS = json.dumps([
     {"type": "fill", "target": "coupon-input", "value": "SALE20", "timestamp": 1.0, "text": "优惠码"},
@@ -100,9 +112,11 @@ def build_app():
         )
         gr.Markdown("### 🎬 自动输入（任选一种，自动填操作 / 口述 / 截图）")
         with gr.Row():
-            record_btn = gr.Button("🎬 录制操作", variant="primary", size="lg", scale=1)
+            record_btn = gr.Button("🖱️ 录制网页操作", variant="primary", size="lg", scale=1)
             parse_btn = gr.Button("🎬 从视频生成", variant="primary", size="lg", scale=1)
         video_in = gr.Video(label="上传操作视频（配合上方「从视频生成」）")
+        audio_in = gr.Audio(label="🎤 语音口述（录音 / 上传音频 → 转口述）", type="filepath")
+        asr_btn = gr.Button("🎤 语音转口述", variant="primary", size="lg")
         parse_msg = gr.Markdown()
         with gr.Row():
             actions_json = gr.Textbox(label="操作步骤 JSON（上方按钮自动填 / 可手改）", value=DEMO_ACTIONS, lines=12, scale=2)
@@ -111,6 +125,7 @@ def build_app():
                 screenshot = gr.Image(label="Bug 截图（可选，VL 视觉）", type="filepath")
         record_btn.click(record_actions_fn, [], [actions_json])
         parse_btn.click(parse_video_fn, [video_in], [actions_json, narration, screenshot, parse_msg])
+        asr_btn.click(audio_to_narration_fn, [audio_in], [narration, parse_msg])
         with gr.Accordion("高级（项目目录 / 代码检索）", open=False):
             with gr.Row():
                 project_dir = gr.Textbox(label="被测项目目录", value=DEMO_PROJECT, scale=2)
