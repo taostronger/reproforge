@@ -22,6 +22,8 @@ class ReproductionResult:
     stable_rate: str = ""         # 如 "3/3"
     rounds: int = 0               # 定位器修复轮数
     reason: str = ""              # "stable_repro" / "no_bug" / "unstable"
+    classification: str = ""      # deterministic / intermittent / unconfirmed（review 二.3）
+    reproduction_rate: float = 0.0  # Bug 复现率 = fail_count / n
 
 
 _GEN_PROMPT = """你是测试工程师。根据操作步骤生成一个 Playwright (TypeScript) 测试来复现 Bug。
@@ -124,18 +126,21 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
     steps = _events_to_steps(timeline)
     spec_code = generate_test(steps, timeline.expected, timeline.actual)
     spec_path = _write(spec_code)
+    # 连跑次数：默认 3（冒烟速度）；严谨评测建议 REPROFORGE_RUNS=10（review 二.3）
+    n = int(os.getenv("REPROFORGE_RUNS", "3"))
     try:
         rounds = 0
         last = None
         stable = False
         for _ in range(3):                       # 1 次初始 + 最多 2 轮修定位器
-            last = run_n_fn(spec_path, 3, cwd=cwd)
+            last = run_n_fn(spec_path, n, cwd=cwd)
             if last.stable_fail:
                 stable = True
                 break
             if last.pass_count == len(last.results):
                 return ReproductionResult(success=False, spec_code=spec_code, spec_path=spec_path,
-                                          rounds=rounds, reason="no_bug")
+                                          rounds=rounds, reason="no_bug",
+                                          classification="unconfirmed", reproduction_rate=0.0)
             if rounds >= 2:
                 break
             spec_code = fix_locator(spec_code, _extract_error(last))
@@ -144,7 +149,9 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
 
         if not stable:
             return ReproductionResult(success=False, spec_code=spec_code, spec_path=spec_path,
-                                      rounds=rounds, reason="unstable")
+                                      rounds=rounds, reason="unstable",
+                                      classification=last.classification,
+                                      reproduction_rate=last.reproduction_rate)
 
         # 最小复现：删候选步骤后用子集重新生成 spec 再跑
         def min_runner(subset):
@@ -160,6 +167,8 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
             stable_rate=f"{last.fail_count}/{len(last.results)}",
             rounds=rounds,
             reason="stable_repro",
+            classification="deterministic",
+            reproduction_rate=last.reproduction_rate,
         )
     finally:
         for p in written:

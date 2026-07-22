@@ -61,3 +61,18 @@ def test_review_fallback_when_llm_fails():
         issue = review("spec", tl, top, repro)
     assert isinstance(issue, Issue)
     assert "160" in issue.body and "80" in issue.body  # 降级 body 仍含 expected/actual
+
+
+def test_review_extracts_stability_class_and_rate():
+    """review 从 repro_result 提取 classification + reproduction_rate 填入 Issue（review 二.3）。"""
+    tl = _timeline()
+    top = TopFiles(files=[])
+    repro = ReproductionResult(
+        success=True, stable_rate="10/10",
+        classification="deterministic", reproduction_rate=1.0,
+        minimized=MagicMock(steps=[{"type": "fill", "target": "qty-input"}]),
+    )
+    with patch("agents.regression.chat", return_value="body"):
+        issue = review("spec", tl, top, repro)
+    assert issue.stability_class == "deterministic"
+    assert issue.reproduction_rate == 1.0
