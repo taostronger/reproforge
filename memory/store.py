@@ -31,6 +31,24 @@ class RemoteEmbeddingFunction:
         resp.raise_for_status()
         return [d["embedding"] for d in resp.json()["data"]]
 
+    # chromadb 1.x EF 协议：add/query 分别走 embed_documents/embed_query（都返回 Embeddings）
+    def embed_documents(self, input):
+        return self.__call__(input)
+
+    def embed_query(self, input):
+        inp = input if isinstance(input, list) else [input]
+        return self.__call__(inp)
+
+    # chromadb 1.x EF 协议要求（用于 collection 冲突校验）
+    def name(self) -> str:
+        return f"remote-{self.model}"
+
+    def default_space(self):
+        return "default"
+
+    def required_columns(self):
+        return {}
+
 
 class MemoryStore:
     """本地持久化向量库（chromadb）+ 远程 embedding（spark-71 bge）。"""
