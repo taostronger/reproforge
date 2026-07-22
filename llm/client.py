@@ -67,7 +67,13 @@ def chat_json(messages, model=None):
 
 
 def chat_vision(messages, model=None):
-    """多模态调用（content 可含 image_url，本地 Qwen2.5-VL 优先 + 远程 step-3.7 fallback）。"""
+    """多模态调用（content 可含 image_url，本地 Qwen2.5-VL 优先 + 远程 step-3.7 fallback）。
+
+    为何 VL 用专用 Qwen2.5-VL 而非文本实例 qwen3.6：qwen3.6 虽是多模态（Qwen3.5 MoE，
+    config.json 的 vision_config=True，实测能看图），但它是 reasoning 模型，输出大段
+    推理、不遵循「只输出 JSON」指令；而 chat_vision 靠 re.search 提 JSON——故 VL 用
+    instruction-tuned 的 Qwen2.5-VL，不用 qwen3.6 兼任（合并会导致 vision 降级）。
+    """
     content = _chat_with_fallback(
         messages, get_local_vl_config(), get_remote_vl_config(),
         0.1, _VL_LOCAL_TIMEOUT, model=model)
