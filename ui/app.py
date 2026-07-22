@@ -95,6 +95,7 @@ def build_app():
             '<div class="rf-title">🔧 ReproForge</div>'
             '<div class="rf-sub">大模型理解 Bug，Playwright 证明 Bug · 多模态视觉 + 历史记忆</div>'
             '<div class="rf-pipeline">vision → evidence → reproduction → recall → investigator → regression</div>'
+            '<div style="margin-top:10px;"><a href="http://localhost:5173" target="_blank" rel="noopener" style="color:#10b981;font-weight:600;text-decoration:none;">→ 打开被测商城（操作发现 Bug 后回来复现）</a></div>'
             '</div>'
         )
         record_btn = gr.Button("🎬 录制操作（弹浏览器操作商城，完事点页面「完成录制」）", size="sm")

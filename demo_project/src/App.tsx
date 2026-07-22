@@ -68,6 +68,9 @@ export default function App() {
       <header className="hdr">
         <div className="brand">⚙️ ForgeMall</div>
         <div className="slogan">DGX Spark 测试商城 · 预埋 Bug 演示</div>
+        <button className="report-bug" onClick={() => window.open('http://localhost:7860', '_blank', 'noopener')}>
+          🐞 Report Bug
+        </button>
       </header>
 
       <section className="shelf">

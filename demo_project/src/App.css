@@ -19,10 +19,17 @@ body {
 
 /* header */
 .hdr {
-  display: flex; align-items: baseline; gap: 14px;
+  display: flex; align-items: center; gap: 14px;
   padding: 12px 0 20px; margin-bottom: 8px;
   border-bottom: 2px solid var(--ink);
 }
+.report-bug {
+  margin-left: auto;
+  background: var(--ink); color: #fff; border: 0;
+  padding: 9px 16px; border-radius: 9px; font-weight: 700;
+  cursor: pointer; font-size: 13px; transition: background .15s;
+}
+.report-bug:hover { background: var(--brand-dark); }
 .brand { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; }
 .slogan { color: var(--muted); font-size: 13px; }
 
