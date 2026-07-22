@@ -120,6 +120,31 @@ def generate_test(steps, expected, actual, base_url="http://localhost:5173"):
     return _ensure_import(_strip_fence(chat([{"role": "user", "content": prompt}])))
 
 
+def _extract_assert(spec_code):
+    """从 spec 提取断言行（expect...），供 minimize 确定性复用，不重新调 LLM。"""
+    import re
+    m = re.search(r'(await expect\([^;]+\);)', spec_code)
+    return m.group(1) if m else "await expect(page.getByTestId('total-price')).toHaveText('0');"
+
+
+def _det_spec(steps, assert_line, base_url="http://localhost:5173"):
+    """确定性生成 spec（goto + actions + 断言），不调 LLM —— minimize 提速用。"""
+    lines = [
+        "import { test, expect } from '@playwright/test';",
+        f"test('repro', async ({{ page }}) => {{",
+        f"  await page.goto('{base_url}');",
+    ]
+    for s in steps:
+        t = s.get("target") or ""
+        if s.get("type") == "fill":
+            lines.append(f"  await page.getByTestId('{t}').fill('{s.get('value', '')}');")
+        elif s.get("type") == "click":
+            lines.append(f"  await page.getByTestId('{t}').click();")
+    lines.append(f"  {assert_line}")
+    lines.append("});")
+    return "\n".join(lines)
+
+
 def fix_locator(spec_code, error_msg):
     prompt = _FIX_PROMPT.format(spec=spec_code, error=error_msg or "locator not found")
     return chat([{"role": "user", "content": prompt}])
@@ -170,9 +195,10 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
                                       classification=last.classification,
                                       reproduction_rate=last.reproduction_rate)
 
-        # 最小复现：删候选步骤后用子集重新生成 spec 再跑
+        # 最小复现：删候选步骤后用确定性 spec（复用首次断言，不重新调 LLM）真跑 —— 提速
+        assert_line = _extract_assert(spec_code)
         def min_runner(subset):
-            sub_code = generate_test(subset, timeline.expected, timeline.actual)
+            sub_code = _det_spec(subset, assert_line)
             return run_test_fn(_write(sub_code), cwd=cwd)
 
         minimized = minimize(steps, min_runner, max_attempts=5)
