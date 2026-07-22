@@ -18,7 +18,7 @@ log = logging.getLogger("reproforge.llm")
 if not log.handlers:
     logging.basicConfig(level=logging.INFO)
 
-_LOCAL_TIMEOUT = 60      # 文本本地
+_LOCAL_TIMEOUT = 120     # 文本本地（qwen3.6 reasoning 慢，给足避免 fallback 远程）
 _VL_LOCAL_TIMEOUT = 120  # VL 本地（图像慢）
 
 # 触发 fallback 的异常（服务不可用类）
