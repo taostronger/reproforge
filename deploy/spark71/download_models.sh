@@ -1,15 +1,8 @@
 #!/usr/bin/env bash
-# 在 spark-71 执行：下 Qwen2.5-VL-7B + bge-large-zh（走 hf-mirror，避免流量费）
+# spark-71 下模型（modelscope 源，国内快、不走 Xet CAS）
+# 实测：hf-mirror 对大文件(safetensors)走 Xet CAS 易 "read operation timed out"，
+# Qwen 官方在 modelscope 有完整镜像，速度更稳。用 ~/reproforge/.venv（有 modelscope）。
 set -e
-export HF_ENDPOINT=https://hf-mirror.com
-export HF_HUB_DISABLE_XET=1
-
-echo "[1/2] 下载 Qwen2.5-VL-7B-Instruct (~15GB)..."
-huggingface-cli download Qwen/Qwen2.5-VL-7B-Instruct \
-  --local-dir ~/models/Qwen2.5-VL-7B-Instruct
-
-echo "[2/2] 下载 bge-large-zh-v1.5 (~1.3GB)..."
-huggingface-cli download BAAI/bge-large-zh-v1.5 \
-  --local-dir ~/models/bge-large-zh-v1.5
-
-echo "完成：~/models/Qwen2.5-VL-7B-Instruct + ~/models/bge-large-zh-v1.5"
+PYTHON=${PYTHON:-$HOME/reproforge/.venv/bin/python}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+$PYTHON "$SCRIPT_DIR/modelscope_download.py"
