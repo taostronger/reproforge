@@ -166,6 +166,7 @@ ReproForge 用**大模型理解 Bug**（多模态提意图）+ **Playwright 证�
 | 端到端冒烟 | smoke_phase3（主流程）/ smoke_vl（本地 Qwen2.5-VL 看图 confidence 1.00）/ smoke_rag（本地 bge 命中）/ smoke_fallback（本地挂→远程兜底 0.95）|
 | 三服务部署 | spark-71 文本推理✓ / VL 看图✓ / bge embedding✓，峰值显存 ~108GB/119GB |
 | 演示场景 | 商城 Bug1（优惠券不随数量更新）稳定复现：apply 后 80，改数量 2 仍 80（应 160）|
+| **回归闭环** | 同一测试 **buggy 失败**（actual 80）、**fixed 通过**（actual 160）——商城 `?fixed=1` 切修复版验证，最强的「Bug 复现 + 修复验证」证明 |
 
 > 冒烟驱动：多个 mock 测不出的真实 bug（代码围栏 / 漏 import / 路径正则 / VL 启动参数 / 显存共存）都由真调端到端冒烟发现并修复——AI 写的代码必须真跑。
 

@@ -30,8 +30,14 @@ export default function App() {
     return s + p.price * it.qty;
   }, 0);
 
-  // BUG1: 优惠总价只在 apply 时算一次；改数量不重算 → total 不随 qty 变
-  const total = couponApplied && totalAfterDiscount !== null ? totalAfterDiscount : subtotal;
+  // BUG1（buggy 版）: 优惠总价只在 apply 时算一次，改数量不重算 → total 不随 qty 变。
+  //   演示 fixed 闭环：访问 ?fixed=1 时优惠总价随数量实时重算（subtotal*0.8），
+  //   同一测试 buggy 失败（actual 80 ≠ 断言 160）、fixed 通过（actual 160）。
+  const FIXED = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('fixed') === '1';
+  const total = couponApplied
+    ? (FIXED ? subtotal * 0.8 : (totalAfterDiscount !== null ? totalAfterDiscount : subtotal))
+    : subtotal;
 
   const applyCoupon = () => {
     if (coupon.trim() === 'SALE20') {
