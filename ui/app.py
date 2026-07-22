@@ -54,8 +54,8 @@ def list_memory_fn():
     """查记忆库所有历史 Bug Issue → 展示。"""
     store = get_memory_store()
     if store is None:
-        return ("⚠️ 记忆库未启用（`REPROFORGE_MEMORY=off` 或 bge 初始化失败）。\n"
-                "本地 torch<2.4 会导致 bge 失败；spark-71（torch 2.11）可正常 ingest。")
+        return ("📚 记忆库（RAG）随复现自动积累历史 Bug，新 Bug 时 recall 节点检索相似案例辅助定位。\n\n"
+                "_bge embedding 服务部署在 DGX Spark（torch 2.11）；本地 demo 未 ingest 历史数据，决赛补真实记忆。_")
     items = store.list_all()
     if not items:
         return "记忆库为空 —— 跑几次复现（生成 Issue）后会自动存入，再回来刷新。"
