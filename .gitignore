@@ -21,3 +21,4 @@ spike/smoke_generated.spec.ts
 
 # OS
 .DS_Store
+reproforge_memory/
