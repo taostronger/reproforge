@@ -1,32 +1,64 @@
+"""llm/client.py — 统一 LLM 调用（本地优先 + 远程 fallback）。
+
+chat/chat_json：文本（本地 vLLM → 远程 stepfun）。
+chat_vision：VL 多模态（本地 Qwen2.5-VL → 远程 step-3.7）。
+仅对"服务不可用"类异常（连接/超时/5xx）降级；4xx/鉴权失败不降级（兜底无意义）。
+"""
 import json
+import logging
 import re
-from unittest.mock import patch
-from openai import OpenAI
-from config import get_model_config
 
-_client = None
+import httpx
+from openai import (APIConnectionError, APITimeoutError, InternalServerError, OpenAI)
 
-def _get_client():
-    global _client
-    if _client is None:
-        config = get_model_config()
-        _client = OpenAI(base_url=config.base_url, api_key=config.api_key)
-    return _client
+from config import (get_local_model_config, get_local_vl_config,
+                    get_remote_model_config, get_remote_vl_config)
 
-def chat(messages, model=None, temperature=0.3):
-    client = _get_client()
-    cfg = get_model_config()
+log = logging.getLogger("reproforge.llm")
+if not log.handlers:
+    logging.basicConfig(level=logging.INFO)
+
+_LOCAL_TIMEOUT = 60      # 文本本地
+_VL_LOCAL_TIMEOUT = 120  # VL 本地（图像慢）
+
+# 触发 fallback 的异常（服务不可用类）
+_FALLBACK_EXC = (APIConnectionError, APITimeoutError, InternalServerError,
+                 httpx.ConnectError, httpx.TimeoutException)
+
+
+def _call(cfg, messages, temperature, timeout, model=None):
+    """单次调用。每次按 cfg 新建 client（fallback 需独立 client）。"""
+    client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, timeout=timeout)
     resp = client.chat.completions.create(
         model=model or cfg.model, messages=messages, temperature=temperature,
     )
     content = resp.choices[0].message.content
-    # 剥 reasoning thinking（保留思考质量，提取正文/JSON 时剥干净）
+    # 剥 reasoning thinking（本地 qwen3.6 输出带 <think>）
     content = re.sub(r'<think>.*?</think>', '', content, flags=re.S).strip()
-    if '</think>' in content:          # vLLM 可能剥了 <think> 但留 </think> 及之前的思考
+    if '</think>' in content:
         content = content.split('</think>')[-1].strip()
     return content
 
+
+def _chat_with_fallback(messages, local, remote, temperature, timeout, model=None):
+    """本地优先；失败（_FALLBACK_EXC）→ fallback 远程；都失败 raise。"""
+    if local is not None:
+        try:
+            return _call(local, messages, temperature, timeout, model)
+        except _FALLBACK_EXC as e:
+            log.warning("[fallback] 本地 %s 失败(%s) → 切远程", local.base_url, type(e).__name__)
+    return _call(remote, messages, temperature, timeout, model)
+
+
+def chat(messages, model=None, temperature=0.3):
+    """文本对话（本地优先 + 远程 fallback）。"""
+    return _chat_with_fallback(
+        messages, get_local_model_config(), get_remote_model_config(),
+        temperature, _LOCAL_TIMEOUT, model=model)
+
+
 def chat_json(messages, model=None):
+    """文本对话 + JSON 提取。"""
     content = chat(messages, model=model, temperature=0.1)
     match = re.search(r'\{.*\}', content)
     if match:
@@ -35,17 +67,10 @@ def chat_json(messages, model=None):
 
 
 def chat_vision(messages, model=None):
-    """多模态调用（content 可含 image_url），固定走 VL 配置（远程 step-3.7 多模态，不受 PROFILE 影响）。
-
-    本地 qwen3.6 不支持图像，故 VL 始终远程 step-3.7（本地 VL 留决赛 Qwen2.5-VL）。
-    """
-    from config import get_vl_model_config
-    vl = get_vl_model_config()
-    client = OpenAI(base_url=vl.base_url, api_key=vl.api_key)
-    resp = client.chat.completions.create(
-        model=model or vl.model, messages=messages, temperature=0.1,
-    )
-    content = resp.choices[0].message.content
+    """多模态调用（content 可含 image_url，本地 Qwen2.5-VL 优先 + 远程 step-3.7 fallback）。"""
+    content = _chat_with_fallback(
+        messages, get_local_vl_config(), get_remote_vl_config(),
+        0.1, _VL_LOCAL_TIMEOUT, model=model)
     match = re.search(r'\{.*\}', content, re.S)
     if match:
         return json.loads(match.group())
