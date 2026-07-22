@@ -11,6 +11,7 @@ from asr.transcribe import Segment, transcribe
 from graph.workflow import run_pipeline
 from capture.recorder import record_user_session
 from capture.video_parser import parse_video
+from memory.store import get_memory_store
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_PROJECT = str(_REPO_ROOT / "demo_project")
@@ -47,6 +48,23 @@ def audio_to_narration_fn(audio_path):
         return narration, f"✓ 语音转写完成（{len(narration)} 字）"
     except Exception as e:
         return None, f"⚠️ ASR 失败：{e}"
+
+
+def list_memory_fn():
+    """查记忆库所有历史 Bug Issue → 展示。"""
+    store = get_memory_store()
+    if store is None:
+        return ("⚠️ 记忆库未启用（`REPROFORGE_MEMORY=off` 或 bge 初始化失败）。\n"
+                "本地 torch<2.4 会导致 bge 失败；spark-71（torch 2.11）可正常 ingest。")
+    items = store.list_all()
+    if not items:
+        return "记忆库为空 —— 跑几次复现（生成 Issue）后会自动存入，再回来刷新。"
+    lines = [
+        f"- **预期 {m.get('expected', '?')} / 实际 {m.get('actual', '?')}** · "
+        f"可疑 `{m.get('suspected', '(无)')}` · 稳定率 `{m.get('stable_rate', '?')}`"
+        for m in items
+    ]
+    return f"共 **{len(items)}** 条历史 Bug：\n\n" + "\n".join(lines)
 
 DEMO_ACTIONS = json.dumps([
     {"type": "fill", "target": "coupon-input", "value": "SALE20", "timestamp": 1.0, "text": "优惠码"},
@@ -140,6 +158,10 @@ def build_app():
             spec_code = gr.Code(label="生成的 Playwright 测试", language="typescript", scale=1)
         btn.click(run_pipeline_ui, [actions_json, narration, project_dir, repo_path, screenshot],
                   [issue_md, summary, spec_code])
+        gr.Markdown("---\n## 📚 历史 Bug 记忆库（RAG）\n复现过的 Bug 自动入库；新 Bug 时 recall 节点检索相似案例辅助定位")
+        memory_btn = gr.Button("🔄 刷新记忆库", size="sm")
+        memory_view = gr.Markdown()
+        memory_btn.click(list_memory_fn, [], [memory_view])
     return app
 
 

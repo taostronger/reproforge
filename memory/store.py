@@ -50,6 +50,14 @@ class MemoryStore:
                  "distance": res["distances"][0][i]}
                 for i in range(len(res["documents"][0]))]
 
+    def list_all(self):
+        """返回所有历史 Bug Issue（UI 展示用）。空库 → []。"""
+        if self.col.count() == 0:
+            return []
+        data = self.col.get(include=["documents", "metadatas"])
+        return [{"doc": data["documents"][i], **(data["metadatas"][i] or {})}
+                for i in range(len(data["documents"]))]
+
 
 def get_memory_store():
     """构造 MemoryStore；REPROFORGE_MEMORY=off 或初始化失败 → 返回 None（降级）。"""
