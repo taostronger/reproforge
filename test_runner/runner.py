@@ -21,15 +21,35 @@ class RunResult:
 
 @dataclass
 class RunTimesResult:
-    """连跑 N 次的汇总。stable_fail = 全部失败（稳定复现 Bug）。"""
+    """连跑 N 次的汇总。测试失败 = Bug 复现（断言 expected，buggy 版本失败）。
+
+    每次独立 subprocess 跑 `npx playwright test`：playwright 每个 test 默认新建
+    BrowserContext（浏览器侧隔离）；前端 demo 每次 page.goto 重载 → 状态天然重置。
+    """
     pass_count: int = 0
     fail_count: int = 0
     results: list = field(default_factory=list)
 
     @property
+    def n(self) -> int:
+        return len(self.results)
+
+    @property
+    def reproduction_rate(self) -> float:
+        """Bug 复现率 = fail_count / n（测试失败 = Bug 复现）。"""
+        return self.fail_count / self.n if self.n else 0.0
+
+    @property
     def stable_fail(self) -> bool:
-        n = len(self.results)
-        return n > 0 and self.fail_count == n
+        """全部失败 = 稳定复现 Bug（向后兼容）。"""
+        return self.n > 0 and self.fail_count == self.n
+
+    @property
+    def classification(self) -> str:
+        """复现稳定性分类：deterministic(全复现) / intermittent(部分) / unconfirmed(未复现)。"""
+        if self.n == 0 or self.fail_count == 0:
+            return "unconfirmed"
+        return "deterministic" if self.fail_count == self.n else "intermittent"
 
 
 def _build_cmd(spec_path):

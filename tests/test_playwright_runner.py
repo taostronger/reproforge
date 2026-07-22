@@ -69,3 +69,24 @@ def test_run_n_times_stable_fail_when_all_fail():
         m.side_effect = [_cp(1, '{"stats":{"passes":0,"failures":1,"unexpected":1}}')] * 3
         res = run_n_times("x.spec.ts", n=3)
     assert res.fail_count == 3 and res.stable_fail is True
+
+
+def test_run_n_times_classification_and_reproduction_rate():
+    """classification（deterministic/intermittent/unconfirmed）+ reproduction_rate（review 二.3）。"""
+    # deterministic：全失败 = Bug 必现
+    det = RunTimesResult(pass_count=0, fail_count=3, results=[RunResult(False)] * 3)
+    assert det.classification == "deterministic"
+    assert det.reproduction_rate == 1.0
+    # intermittent：部分复现
+    inter = RunTimesResult(pass_count=1, fail_count=2,
+                           results=[RunResult(True), RunResult(False), RunResult(False)])
+    assert inter.classification == "intermittent"
+    assert abs(inter.reproduction_rate - 2 / 3) < 1e-6
+    # unconfirmed：全通过 = 未复现
+    unc = RunTimesResult(pass_count=3, fail_count=0, results=[RunResult(True)] * 3)
+    assert unc.classification == "unconfirmed"
+    assert unc.reproduction_rate == 0.0
+    # 空
+    empty = RunTimesResult()
+    assert empty.classification == "unconfirmed"
+    assert empty.reproduction_rate == 0.0

@@ -15,6 +15,8 @@ class Issue:
     actual: str = ""
     minimal_steps: list = field(default_factory=list)
     stable_rate: str = ""
+    stability_class: str = ""       # deterministic / intermittent / unconfirmed
+    reproduction_rate: float = 0.0  # Bug 复现率
     suspected_files: list = field(default_factory=list)
     body: str = ""           # Markdown 全文
 
@@ -25,7 +27,7 @@ _REVIEW_PROMPT = """你是测试工程师，正在审核一个自动生成的 Pl
 {spec}
 ```
 Bug：预期 {expected}，实际 {actual}。
-最小复现稳定率：{stable_rate}
+复现稳定性：{stability_class}（复现率 {reproduction_rate}）；连跑稳定率：{stable_rate}
 可疑代码文件：{suspected}
 
 请审核并生成 Markdown Issue：
@@ -45,8 +47,9 @@ def _steps_to_human(steps):
     return out
 
 
-def _fallback_body(timeline, minimal_steps, stable_rate, suspected):
+def _fallback_body(timeline, minimal_steps, stable_rate, suspected, stability_class="", reproduction_rate=0.0):
     """LLM 不可用时的确定性 Issue 正文。"""
+    rate_txt = f"{reproduction_rate:.0%}" if reproduction_rate else "N/A"
     lines = [
         f"# Bug：预期 {timeline.expected}，实际 {timeline.actual}",
         "## 预期", timeline.expected or "(未提取)",
@@ -54,6 +57,7 @@ def _fallback_body(timeline, minimal_steps, stable_rate, suspected):
         "## 最小复现步骤",
         *(minimal_steps or ["(无)"]),
         "## 稳定率", stable_rate or "(未跑)",
+        f"- 分类：{stability_class or '(未分类)'}（复现率 {rate_txt}）",
         "## 可疑代码",
         *(suspected or ["(无)"]),
     ]
@@ -73,21 +77,28 @@ def review(spec, timeline, top_files, repro_result=None):
         ]
     minimal_steps = _steps_to_human(min_raw)
     stable_rate = getattr(repro_result, "stable_rate", "") if repro_result else ""
+    stability_class = getattr(repro_result, "classification", "") if repro_result else ""
+    reproduction_rate = getattr(repro_result, "reproduction_rate", 0.0) if repro_result else 0.0
     prompt = _REVIEW_PROMPT.format(
         spec=spec or "(无)", expected=timeline.expected or "(未提取)",
         actual=timeline.actual or "(未提取)", stable_rate=stable_rate or "(未跑)",
+        stability_class=stability_class or "(未分类)",
+        reproduction_rate=f"{reproduction_rate:.0%}" if reproduction_rate else "N/A",
         suspected=", ".join(suspected) or "(无)",
     )
     try:
         body = chat([{"role": "user", "content": prompt}])
     except Exception:
-        body = _fallback_body(timeline, minimal_steps, stable_rate, suspected)
+        body = _fallback_body(timeline, minimal_steps, stable_rate, suspected,
+                              stability_class, reproduction_rate)
     return Issue(
         title=f"Bug：预期 {timeline.expected}，实际 {timeline.actual}",
         expected=timeline.expected,
         actual=timeline.actual,
         minimal_steps=minimal_steps,
         stable_rate=stable_rate,
+        stability_class=stability_class,
+        reproduction_rate=reproduction_rate,
         suspected_files=suspected,
         body=body,
     )

@@ -1,6 +1,6 @@
 """minimization/minimize.py — 最小复现算法（plan Task 2.3，核心创新）
 
-删冗余步骤重跑求最短稳定复现路径。纯确定性，不依赖 LLM。
+删冗余步骤重跑求稳定 1-minimal 复现路径（任一剩余步骤无法再单独删除，不保证全局最短）。纯确定性，不依赖 LLM。
 """
 from dataclasses import dataclass
 
