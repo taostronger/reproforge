@@ -110,7 +110,8 @@ def build_app():
             '<div style="margin-top:10px;"><a href="http://localhost:5173" target="_blank" rel="noopener" style="color:#10b981;font-weight:600;text-decoration:none;">→ 打开被测商城（操作发现 Bug 后回来复现）</a></div>'
             '</div>'
         )
-        gr.Markdown("### 🎬 自动输入（任选一种，自动填操作 / 口述 / 截图）")
+        gr.Markdown("---\n## ① 输入 Bug 信息\n三种方式任选生成，**或直接用下方预填的 Bug1**（跳到 ② 点运行即可）")
+        gr.Markdown("🖱️ **录制网页操作** ｜ 🎬 **从视频生成** ｜ 🎤 **语音口述** —— 自动填操作/口述/截图")
         with gr.Row():
             record_btn = gr.Button("🖱️ 录制网页操作", variant="primary", size="lg", scale=1)
             parse_btn = gr.Button("🎬 从视频生成", variant="primary", size="lg", scale=1)
@@ -130,7 +131,9 @@ def build_app():
             with gr.Row():
                 project_dir = gr.Textbox(label="被测项目目录", value=DEMO_PROJECT, scale=2)
                 repo_path = gr.Textbox(label="代码检索目录（留空同上）", value="", scale=2)
+        gr.Markdown("---\n## ② 运行复现流水线\n点下方按钮 → 自动跑 6 节点（本地 qwen3.6，约 3-4 分钟，请耐心等）")
         btn = gr.Button("▶ 运行复现流水线", variant="primary", size="lg")
+        gr.Markdown("---\n## ③ 复现结果")
         summary = gr.Markdown()
         with gr.Row():
             issue_md = gr.Markdown(label="生成的 Issue", scale=1)
