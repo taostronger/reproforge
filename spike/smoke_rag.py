@@ -12,9 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-# bge 下载复用 whisper 的 HF 镜像环境变量
-os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+# RAG embedding 走 spark-71 bge 服务（经隧道 :8002）
+os.environ.setdefault("EMBEDDING_BASE_URL", "http://localhost:8002")
 os.environ.setdefault("REPROFORGE_MEMORY", "on")
 
 from memory.store import MemoryStore
@@ -27,7 +26,7 @@ if os.path.exists(SMOKE_PATH):
     shutil.rmtree(SMOKE_PATH)                       # 干净起跑
 
 print("=== RAG 冒烟：验证 bge-large-zh + chromadb ===")
-print("(首次下 bge-large-zh ~1.3GB，hf-mirror，请耐心)")
+print("(embedding 走 spark-71 bge 服务 http://localhost:8002，需先起服务 + 隧道)")
 ms = MemoryStore(path=SMOKE_PATH)
 
 # ingest 1 条历史 Bug（模拟之前复现过的）
