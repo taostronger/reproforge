@@ -9,13 +9,13 @@ CRITICAL_KEYWORDS = {"优惠", "券", "数量", "提交", "加入购物车", "�
 
 
 def is_candidate_for_removal(action_type, text=""):
-    """判断该步骤是否候选可删（只删点击/悬停类无关步骤，保留关键填写）。"""
-    if action_type not in ("click", "hover"):
-        return False
-    t = text or ""
-    if any(k in t for k in CRITICAL_KEYWORDS):
-        return False
-    return any(k in t for k in IRRELEVANT_KEYWORDS) or action_type == "hover"
+    """候选可删：click/hover 都候选（fill/select 等关键填写保留）。
+
+    靠 minimize 重跑验证决定真删/保留，而非关键词硬判——避免「中文关键词 vs 英文 testid
+    不匹配」导致只删 hover 的问题。关键 click（如 apply-btn）删了 Bug 不在 → 自动保留；
+    冗余 click（多余 add/remove）删了 Bug 仍在 → 真删。
+    """
+    return action_type in ("click", "hover")
 
 
 @dataclass

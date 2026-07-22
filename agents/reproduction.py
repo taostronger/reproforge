@@ -65,6 +65,23 @@ def _events_to_steps(timeline):
     ]
 
 
+def _dedup_steps(steps):
+    """合并连续同 target 步骤：同 target 的 fill 覆盖留最后值，冗余 click 跳过。
+
+    录制时常有 qty fill 2→1→2 + 每次 click 的冗余；合并后 spec 更短，Playwright 真跑
+    和 minimize 都更快。不同 target（apply-btn / add-* / remove-btn）的 click 保留。
+    """
+    out = []
+    for s in steps:
+        t = s.get("target")
+        if t and out and out[-1].get("target") == t:
+            if s.get("type") == "fill":
+                out[-1] = s        # 同 target fill：覆盖，留最后值
+            continue                # 同 target click：跳过（冗余）
+        out.append(s)
+    return out
+
+
 def _steps_to_actions_desc(steps):
     lines = []
     for s in steps:
@@ -123,7 +140,7 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
         written.append(p)
         return p
 
-    steps = _events_to_steps(timeline)
+    steps = _dedup_steps(_events_to_steps(timeline))
     spec_code = generate_test(steps, timeline.expected, timeline.actual)
     spec_path = _write(spec_code)
     # 连跑次数：默认 3（冒烟速度）；严谨评测建议 REPROFORGE_RUNS=10（review 二.3）
@@ -158,7 +175,7 @@ def reproduce(timeline, run_test_fn=None, run_n_fn=None, workdir=None, project_d
             sub_code = generate_test(subset, timeline.expected, timeline.actual)
             return run_test_fn(_write(sub_code), cwd=cwd)
 
-        minimized = minimize(steps, min_runner)
+        minimized = minimize(steps, min_runner, max_attempts=5)
         return ReproductionResult(
             success=True,
             spec_code=spec_code,
