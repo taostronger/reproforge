@@ -98,12 +98,14 @@ def build_app():
             '<div style="margin-top:10px;"><a href="http://localhost:5173" target="_blank" rel="noopener" style="color:#10b981;font-weight:600;text-decoration:none;">→ 打开被测商城（操作发现 Bug 后回来复现）</a></div>'
             '</div>'
         )
-        record_btn = gr.Button("🎬 录制操作（弹浏览器操作商城，完事点页面「完成录制」）", size="sm")
-        video_in = gr.Video(label="上传操作视频（可选 → 点下方按钮自动生成 actions / 口述 / 截图）")
-        parse_btn = gr.Button("🎬 从视频生成（解析操作 + 口述 + 截图）", size="sm")
+        gr.Markdown("### 🎬 自动输入（任选一种，自动填操作 / 口述 / 截图）")
+        with gr.Row():
+            record_btn = gr.Button("🎬 录制操作", variant="primary", size="lg", scale=1)
+            parse_btn = gr.Button("🎬 从视频生成", variant="primary", size="lg", scale=1)
+        video_in = gr.Video(label="上传操作视频（配合上方「从视频生成」）")
         parse_msg = gr.Markdown()
         with gr.Row():
-            actions_json = gr.Textbox(label="操作步骤 JSON（可点上方按钮真实录制）", value=DEMO_ACTIONS, lines=12, scale=2)
+            actions_json = gr.Textbox(label="操作步骤 JSON（上方按钮自动填 / 可手改）", value=DEMO_ACTIONS, lines=12, scale=2)
             with gr.Column(scale=1):
                 narration = gr.Textbox(label="测试员口述", value=DEMO_NARRATION, lines=3)
                 screenshot = gr.Image(label="Bug 截图（可选，VL 视觉）", type="filepath")
